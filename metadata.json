@@ -1,0 +1,8 @@
+{
+  "name": "Payment Orchestration Layer with Multi-Gateway Failover",
+  "description": "Production-grade payment orchestration layer with multi-gateway failover, circuit breakers, idempotency locks, webhook deduplication, and periodic reconciliation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

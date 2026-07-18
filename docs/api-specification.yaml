@@ -1,0 +1,279 @@
+openapi: 3.0.3
+info:
+  title: PayFlow Payment Orchestration API
+  description: Production-grade Payment Orchestration Layer with Multi-Gateway Failover and state machine tracking.
+  version: 1.2.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development Server
+paths:
+  /payments:
+    post:
+      summary: Initiate a new payment
+      description: Recepts payment request, scores gateways, handles idempotency, and starts authorization.
+      headers:
+        Idempotency-Key:
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Client-generated unique request identifier.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount_paise
+                - currency
+                - payment_method
+                - merchant_id
+                - merchant_order_id
+              properties:
+                amount_paise:
+                  type: integer
+                  description: Payment amount in paise (integers only).
+                currency:
+                  type: string
+                  example: INR
+                payment_method:
+                  type: string
+                  enum: [CARD, UPI, NET_BANKING, WALLET]
+                merchant_id:
+                  type: string
+                merchant_order_id:
+                  type: string
+                customer_email:
+                  type: string
+      responses:
+        '201':
+          description: Authorized or Captured successfully.
+        '409':
+          description: Concurrent request or Idempotency key conflict.
+        '400':
+          description: Hard decline or validation failure.
+        '503':
+          description: Outbound routing or gateway connection timeout.
+
+  /payments/{id}:
+    get:
+      summary: Retrieve payment details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detailed transaction state machine record.
+
+  /payments/{id}/capture:
+    post:
+      summary: Capture an authorised payment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                capture_amount_paise:
+                  type: integer
+                  description: Optional amount for partial captures.
+      responses:
+        '200':
+          description: Capturing success details.
+
+  /payments/{id}/void:
+    post:
+      summary: Void an authorised hold
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Hold voided successfully.
+
+  /payments/{id}/refund:
+    post:
+      summary: Refund a captured payment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                refund_amount_paise:
+                  type: integer
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Refund completed.
+
+  /payments/{id}/refunds:
+    get:
+      summary: List refunds for a payment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of refund records.
+
+  /payments/{id}/timeline:
+    get:
+      summary: Retrieve chronological state logs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: State machine logs and audit trails.
+
+  /webhooks/razorpay:
+    post:
+      summary: Razorpay webhook ingest
+      responses:
+        '200':
+          description: Webhook received.
+
+  /webhooks/stripe:
+    post:
+      summary: Stripe webhook ingest
+      responses:
+        '200':
+          description: Webhook received.
+
+  /webhooks/payu:
+    post:
+      summary: PayU webhook ingest
+      responses:
+        '200':
+          description: Webhook received.
+
+  /webhooks/upi:
+    post:
+      summary: UPI callback receiver
+      responses:
+        '200':
+          description: Callback processed.
+
+  /gateways:
+    get:
+      summary: List configured gateways
+      responses:
+        '200':
+          description: Pricing and rate limit details.
+
+  /gateways/{name}/health:
+    get:
+      summary: Get gateway health status
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Circuit breaker active states.
+
+  /gateways/{name}/metrics:
+    get:
+      summary: Get performance metrics
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: P95 latencies and transaction success volumes.
+
+  /gateways/{name}/config:
+    post:
+      summary: Update gateway configurations
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Config successfully saved.
+
+  /routing/config:
+    get:
+      summary: Retrieve routing weights
+      responses:
+        '200':
+          description: Weight metrics JSON object.
+    post:
+      summary: Save routing weights
+      responses:
+        '200':
+          description: Config updated.
+
+  /reconciliation/trigger:
+    post:
+      summary: Manually run reconciliation batch
+      responses:
+        '200':
+          description: Reports discrepancies and overrides.
+
+  /reconciliation/reports/{run_id}:
+    get:
+      summary: Retrieve specific reconciliation report
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Process logs and active anomalies.
+
+  /analytics/success-rate:
+    get:
+      summary: Gateway success analytics
+      responses:
+        '200':
+          description: Array of success percentages.
+
+  /analytics/volume:
+    get:
+      summary: Transaction volume analytics
+      responses:
+        '200':
+          description: Total amounts and transaction counts.
+
+  /health:
+    get:
+      summary: Server health check
+      responses:
+        '200':
+          description: Returns system operational details.
